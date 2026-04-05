@@ -7,7 +7,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 @st.cache_data # Cache so it doesn't reload every time you click a button
 def load_and_clean_data():
     movies = pd.read_csv('tmdb_5000_movies.csv')
-    credits = pd.read_csv('tmdb_5000_credits.csv')
+    credits = pd.read_csv('tmdb_5000_credits.zip')
     
     # Merge datasets on title
     movies = movies.merge(credits, on='title')

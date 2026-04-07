@@ -1,103 +1,57 @@
+import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from surprise import Reader, Dataset, SVD
-from surprise.model_selection import train_test_split
-from surprise.accuracy import rmse
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-# ==========================================
-# 1. DATA LOADING & PREPROCESSING
-# ==========================================
+st.title("🎬 Movie Recommendation System")
 
-# Note: Ensure 'movies.csv' and 'ratings.csv' (from MovieLens dataset) are in your directory
-try:
+# 1. Load Data
+@st.cache_data
+def load_data():
+    # Make sure these files are in your GitHub repo!
     movies = pd.read_csv('movies.csv')
     ratings = pd.read_csv('ratings.csv')
-except FileNotFoundError:
-    print("Error: Please ensure 'movies.csv' and 'ratings.csv' are in the project folder.")
-    exit()
+    return movies, ratings
 
-# Merge datasets for collaborative filtering tasks later
-movie_ratings = pd.merge(movies, ratings, on='movieId')
-movie_ratings.dropna(inplace=True)
-
-print("Data Loaded Successfully.")
-print(movies.head())
-
-# ==========================================
-# 2. CONTENT-BASED FILTERING (By Genre)
-# ==========================================
-
-# Initialize TF-IDF Vectorizer to turn genres into numerical vectors
-tfidf = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf.fit_transform(movies['genres'])
-
-# Compute Cosine Similarity between all movies based on genres
-cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-# Map movie titles to their indices
-movie_indices = pd.Series(movies.index, index=movies['title']).drop_duplicates()
-
-def recommend_movies_by_content(title, cosine_sim=cosine_sim):
-    if title not in movie_indices:
-        return "Movie title not found in database."
+try:
+    movies, ratings = load_data()
     
-    # Get index of the movie
-    idx = movie_indices[title]
-    
-    # Get similarity scores for all movies with that movie
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    
-    # Sort movies based on similarity scores (descending)
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    
-    # Get indices of the top 10 most similar movies (excluding itself)
-    sim_scores = sim_scores[1:11]
-    movie_indices_similar = [i[0] for i in sim_scores]
-    
-    return movies['title'].iloc[movie_indices_similar]
+    # 2. Content-Based Filtering (Genres)
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(movies['genres'])
+    content_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
-# ==========================================
-# 3. COLLABORATIVE FILTERING (By User Taste)
-# ==========================================
+    # 3. Collaborative Filtering (User-Item Matrix)
+    # Creating a matrix where rows are users and columns are movies
+    user_movie_matrix = ratings.pivot(index='userId', columns='movieId', values='rating').fillna(0)
+    user_sim = cosine_similarity(user_movie_matrix)
+    user_sim_df = pd.DataFrame(user_sim, index=user_movie_matrix.index, columns=user_movie_matrix.index)
 
-# Setup Surprise reader and load the dataframe
-reader = Reader(rating_scale=(0.5, 5))
-data = Dataset.load_from_df(movie_ratings[['userId', 'movieId', 'rating']], reader)
+    # --- UI Logic ---
+    option = st.selectbox("How do you want recommendations?", ["By Movie Title", "By User ID"])
 
-# Split into training and testing sets
-trainset, testset = train_test_split(data, test_size=0.25)
+    if option == "By Movie Title":
+        movie_list = movies['title'].values
+        selected_movie = st.selectbox("Type or select a movie", movie_list)
+        
+        if st.button('Show Recommendations'):
+            idx = movies[movies['title'] == selected_movie].index[0]
+            distances = sorted(list(enumerate(content_sim[idx])), reverse=True, key=lambda x: x[1])
+            for i in distances[1:6]:
+                st.write(movies.iloc[i[0]].title)
 
-# Use SVD (Singular Value Decomposition) algorithm
-algo = SVD()
-algo.fit(trainset)
+    else:
+        user_id = st.number_input("Enter User ID", min_value=1, step=1)
+        if st.button('Show User Recommendations'):
+            # Find similar users
+            similar_users = user_sim_df[user_id].sort_values(ascending=False).index[1:6]
+            # Get movies those users liked
+            recommended_movies = ratings[ratings['userId'].isin(similar_users)].sort_values(by='rating', ascending=False)
+            top_movies = recommended_movies['movieId'].unique()[:5]
+            
+            for m_id in top_movies:
+                name = movies[movies['movieId'] == m_id]['title'].values[0]
+                st.write(name)
 
-# Evaluate the model
-predictions = algo.test(testset)
-print(f"Collaborative Filtering Model RMSE: {rmse(predictions):.4f}")
-
-def recommend_for_user(user_id, n_recommendations=10):
-    # Get list of all unique movie IDs
-    all_movie_ids = movie_ratings['movieId'].unique()
-    
-    # Predict ratings for movies the user hasn't seen (or all movies)
-    user_predictions = [algo.predict(user_id, m_id) for m_id in all_movie_ids]
-    
-    # Sort predictions by estimated rating (highest to lowest)
-    user_predictions = sorted(user_predictions, key=lambda x: x.est, reverse=True)
-    
-    # Get top N movie IDs
-    top_n_ids = [pred.iid for pred in user_predictions[:n_recommendations]]
-    
-    return movies[movies['movieId'].isin(top_n_ids)]['title']
-
-# ==========================================
-# 4. TESTING THE SYSTEM
-# ==========================================
-
-print("\n--- Content-Based Recommendations for 'Toy Story (1995)' ---")
-print(recommend_movies_by_content('Toy Story (1995)'))
-
-print("\n--- Collaborative Recommendations for User ID: 1 ---")
-print(recommend_for_user(user_id=1))
+except Exception as e:
+    st.error(f"Please ensure movies.csv and ratings.csv are uploaded. Error: {e}")

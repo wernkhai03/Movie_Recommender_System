@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import mean_squared_error
 
 # 1. Page Configuration
-st.set_page_config(page_title="Movie Matcher AI", page_icon="🍿", layout="wide")
+st.set_page_config(page_title="Movie Recommender System", page_icon="🍿", layout="wide")
 
 # 2. Data Loading
 @st.cache_data
@@ -31,7 +31,7 @@ def get_user_rmse(user_ratings, all_ratings):
 
 # --- Main App Logic ---
 if movies is not None and ratings is not None:
-    st.title("🎬 Movie Matcher AI")
+    st.title("🎬 Movie Recommender System")
     
     # Create the Tabs FIRST so they are defined for the rest of the script
     tab1, tab2 = st.tabs(["🔍 Search by Movie", "👤 Personal User Picks"])
@@ -98,4 +98,3 @@ else:
 
 # Footer
 st.sidebar.write("---")
-st.sidebar.caption("System Accuracy (RMSE) fulfills Assignment Req 3.d.ii")

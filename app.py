@@ -41,7 +41,6 @@ try:
                 st.write(movies.iloc[i[0]].title)
 
     else:
-       else:
     user_id = st.number_input("Enter User ID", min_value=1, step=1)
     
     if st.button('Show User Recommendations'):

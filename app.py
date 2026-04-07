@@ -86,4 +86,4 @@ if movies is not None:
 
 # --- Footer ---
 st.divider()
-st.caption("Built
+st.caption("Built with Scikit-Learn and Streamlit")

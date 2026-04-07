@@ -3,8 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
-  - pandas
-  - numpy
-  - scikit-learn
-  - scikit-surprise
   - streamlit
+  - pip
+  - pip:
+      - pandas
+      - numpy
+      - scikit-learn
+      - scikit-surprise

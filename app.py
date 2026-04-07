@@ -41,17 +41,37 @@ try:
                 st.write(movies.iloc[i[0]].title)
 
     else:
-        user_id = st.number_input("Enter User ID", min_value=1, step=1)
-        if st.button('Show User Recommendations'):
-            # Find similar users
-            similar_users = user_sim_df[user_id].sort_values(ascending=False).index[1:6]
-            # Get movies those users liked
-            recommended_movies = ratings[ratings['userId'].isin(similar_users)].sort_values(by='rating', ascending=False)
-            top_movies = recommended_movies['movieId'].unique()[:5]
+       else:
+    user_id = st.number_input("Enter User ID", min_value=1, step=1)
+    
+    if st.button('Show User Recommendations'):
+        # 1. Get movies this specific user has already rated highly
+        user_ratings = ratings[ratings['userId'] == user_id]
+        if user_ratings.empty:
+            st.warning("User ID not found in the dataset.")
+        else:
+            # 2. Find "Peer" users who watched the same movies
+            watched_movie_ids = user_ratings['movieId'].unique()
+            peer_users = ratings[ratings['movieId'].isin(watched_movie_ids)]['userId'].unique()
             
-            for m_id in top_movies:
-                name = movies[movies['movieId'] == m_id]['title'].values[0]
-                st.write(name)
+            # 3. Create a SMALLER matrix of just these peers and movies
+            # This prevents the "Out of Memory" crash
+            small_ratings = ratings[ratings['userId'].isin(peer_users)]
+            
+            # Use a simple top-rated strategy from similar users
+            # (Instead of a full similarity matrix which is heavy)
+            recommendations = (
+                small_ratings[~small_ratings['movieId'].isin(watched_movie_ids)]
+                .groupby('movieId')['rating']
+                .mean()
+                .sort_values(ascending=False)
+                .head(5)
+            )
+            
+            st.subheader(f"Top Recommendations for User {user_id}:")
+            for m_id in recommendations.index:
+                movie_name = movies[movies['movieId'] == m_id]['title'].values[0]
+                st.write(f"⭐ {movie_name}")
 
 except Exception as e:
     st.error(f"Please ensure movies.csv and ratings.csv are uploaded. Error: {e}")
